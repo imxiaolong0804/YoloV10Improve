@@ -1,0 +1,127 @@
+# Ultralytics YOLO 🚀, AGPL-3.0 许可
+# 中等增强 COCO 训练的默认训练设置和超参数
+
+task: detect # (str) YOLO 任务类型，例如 detect（检测）、segment（分割）、classify（分类）、pose（姿态）
+mode: train # (str) YOLO 模式，例如 train（训练）、val（验证）、predict（预测）、export（导出）、track（跟踪）、benchmark（基准）
+
+# 训练设置 -------------------------------------------------------------------------------------------------------
+model: # (str, 可选) 模型文件路径，例如 yolov8n.pt、yolov8n.yaml
+data: # (str, 可选) 数据文件路径，例如 coco128.yaml
+epochs: 100 # (int) 训练的轮次
+time: # (float, 可选) 训练的小时数，如果提供则覆盖 epochs
+patience: 100 # (int) 没有明显改进时，训练早停的轮次
+batch: 16 # (int) 每批次的图片数量 (-1 表示自动批次)
+imgsz: 640 # (int | list) 输入图像大小，对于训练和验证模式为整数，对于预测和导出模式为列表 [w,h]
+save: True # (bool) 是否保存训练检查点和预测结果
+save_period: -1 # (int) 每 x 轮保存一次检查点（小于 1 时禁用）
+val_period: 1 # (int) 每 x 轮进行一次验证
+cache: False # (bool) 是否使用缓存进行数据加载，True/ram 表示内存，disk 表示硬盘，False 表示不使用缓存
+device: # (int | str | list, 可选) 设备类型，例如 cuda device=0 或 device=0,1,2,3 或 device=cpu
+workers: 8 # (int) 数据加载时的工作线程数量（如果使用 DDP，则为每个 RANK）
+project: # (str, 可选) 项目名称
+name: # (str, 可选) 实验名称，结果保存到 'project/name' 目录
+exist_ok: False # (bool) 是否覆盖现有的实验
+pretrained: True # (bool | str) 是否使用预训练模型（True），或者从指定模型加载权重（str）
+optimizer: auto # (str) 使用的优化器，选择项为 [SGD, Adam, Adamax, AdamW, NAdam, RAdam, RMSProp, auto]
+verbose: True # (bool) 是否打印详细输出
+seed: 0 # (int) 随机种子，用于结果的可重复性
+deterministic: True # (bool) 是否启用确定性模式
+single_cls: False # (bool) 是否将多类数据当作单类数据训练
+rect: False # (bool) 如果模式为 'train'，则进行矩形训练；如果模式为 'val'，则进行矩形验证
+cos_lr: False # (bool) 是否使用余弦学习率调度器
+close_mosaic: 10 # (int) 在最后几个 epoch 禁用马赛克增强（0 表示禁用）
+resume: False # (bool) 是否从上一个检查点恢复训练
+amp: True # (bool) 自动混合精度（AMP）训练，选择 [True, False]，True 会运行 AMP 检查
+fraction: 1.0 # (float) 训练时使用的训练集数据比例（默认为 1.0，表示使用所有图片）
+profile: False # (bool) 是否在训练期间记录 ONNX 和 TensorRT 的速度
+freeze: None # (int | list, 可选) 冻结前 n 层，或冻结指定的层索引列表
+multi_scale: False # (bool) 是否在训练过程中使用多尺度
+# 分割
+overlap_mask: True # (bool) 在训练过程中是否允许掩码重叠（仅适用于分割训练）
+mask_ratio: 4 # (int) 掩码下采样比例（仅适用于分割训练）
+# 分类
+dropout: 0.0 # (float) 是否使用 dropout 正则化（仅适用于分类训练）
+
+# 验证/测试设置 ----------------------------------------------------------------------------------------------------
+val: True # (bool) 是否在训练过程中进行验证/测试
+split: val # (str) 用于验证的数据集分割类型，例如 'val'、'test' 或 'train'
+save_json: False # (bool) 是否将结果保存为 JSON 文件
+save_hybrid: False # (bool) 是否保存标签和附加预测的混合版本
+conf: # (float, 可选) 检测的对象置信度阈值（默认 0.25 用于预测，0.001 用于验证）
+iou: 0.7 # (float) NMS（非极大值抑制）的交并比（IoU）阈值
+max_det: 300 # (int) 每张图片的最大检测数量
+half: False # (bool) 是否使用半精度（FP16）
+dnn: False # (bool) 是否使用 OpenCV DNN 进行 ONNX 推理
+plots: True # (bool) 是否在训练/验证过程中保存图像和图表
+
+# 预测设置 -----------------------------------------------------------------------------------------------------
+source: # (str, 可选) 预测图片或视频的源目录
+vid_stride: 1 # (int) 视频帧率步长
+stream_buffer: False # (bool) 是否缓存所有流媒体帧（True）或仅返回最新帧（False）
+visualize: False # (bool) 是否可视化模型特征
+augment: False # (bool) 是否对预测源进行图像增强
+agnostic_nms: False # (bool) 是否使用类无关的 NMS
+classes: # (int | list[int], 可选) 按类别筛选结果，例如 classes=0 或 classes=[0,2,3]
+retina_masks: False # (bool) 是否使用高分辨率的分割掩码
+embed: # (list[int], 可选) 从指定层返回特征向量/嵌入
+
+# 可视化设置 ---------------------------------------------------------------------------------------------------
+show: False # (bool) 是否显示预测的图像和视频（如果环境允许）
+save_frames: False # (bool) 是否保存预测的单个视频帧
+save_txt: False # (bool) 是否将结果保存为 .txt 文件
+save_conf: False # (bool) 是否保存包含置信度分数的结果
+save_crop: False # (bool) 是否保存裁剪后的图像及结果
+show_labels: True # (bool) 是否显示预测标签，例如 'person'
+show_conf: True # (bool) 是否显示预测置信度，例如 '0.99'
+show_boxes: True # (bool) 是否显示预测框
+line_width: # (int, 可选) 边界框的线宽。如果为 None，则根据图像大小进行缩放
+
+# 导出设置 ------------------------------------------------------------------------------------------------------
+format: torchscript # (str) 导出格式，选择项见 https://docs.ultralytics.com/modes/export/#export-formats
+keras: False # (bool) 是否使用 Keras
+optimize: False # (bool) 是否为移动设备优化 TorchScript 模型
+int8: False # (bool) CoreML/TF INT8 量化
+dynamic: False # (bool) ONNX/TF/TensorRT: 是否使用动态轴
+simplify: False # (bool) 是否简化 ONNX 模型
+opset: # (int, 可选) ONNX 操作集版本
+workspace: 4 # (int) TensorRT: 工作区大小（GB）
+nms: False # (bool) CoreML: 是否添加 NMS
+
+# 超参数 ------------------------------------------------------------------------------------------------------
+lr0: 0.01 # (float) 初始学习率（例如 SGD=1E-2，Adam=1E-3）
+lrf: 0.01 # (float) 最终学习率（lr0 * lrf）
+momentum: 0.937 # (float) SGD 动量/Adam beta1
+weight_decay: 0.0005 # (float) 优化器的权重衰减 5e-4
+warmup_epochs: 3.0 # (float) 预热轮次（可以是小数）
+warmup_momentum: 0.8 # (float) 预热初始动量
+warmup_bias_lr: 0.1 # (float) 预热初始偏置学习率
+box: 7.5 # (float) 盒子损失系数
+cls: 0.5 # (float) 类别损失系数（与像素数量成比例）
+dfl: 1.5 # (float) DFL 损失系数
+pose: 12.0 # (float) 姿态损失系数
+kobj: 1.0 # (float) 关键点对象损失系数
+label_smoothing: 0.0 # (float) 标签平滑（比例）
+nbs: 64 # (int) 名义批次大小
+hsv_h: 0.015 # (float) 图像 HSV-色相增强（比例）
+hsv_s: 0.7 # (float) 图像 HSV-饱和度增强（比例）
+hsv_v: 0.4 # (float) 图像 HSV-亮度增强（比例）
+degrees: 0.0 # (float) 图像旋转（度数）
+translate: 0.1 # (float) 图像平移（比例）
+scale: 0.5 # (float) 图像缩放（增益比例）
+shear: 0.0 # (float) 图像剪切（度数）
+perspective: 0.0 # (float) 图像透视变换（比例，范围 0-0.001）
+flipud: 0.0 # (float) 图像上下翻转的概率
+fliplr: 0.5 # (float) 图像左右翻转的概率
+bgr: 0.0 # (float) 图像通道 BGR（概率）
+mosaic: 1.0 # (float) 图像马赛克增强的概率
+mixup: 0.0 # (float) 图像混合增强的概率
+copy_paste: 0.0 # (float) 分割复制粘贴的概率
+auto_augment: randaugment # (str) 分类的自动增强策略（randaugment、autoaugment、augmix）
+erasing: 0.4 # (float) 分类训练期间随机擦除的概率（0-1）
+crop_fraction: 1.0 # (float) 分类评估/推理时的图像裁剪比例（0-1）
+
+# 自定义 config.yaml ---------------------------------------------------------------------------------------------------
+cfg: # (str, 可选) 用于覆盖默认的 defaults.yaml 配置
+
+# 跟踪器设置 ------------------------------------------------------------------------------------------------------
+tracker: botsort.yaml # (str) 跟踪器类型，选择项为 [botsort.yaml, bytetrack.yaml]
