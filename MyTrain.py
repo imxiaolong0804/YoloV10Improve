@@ -1,15 +1,17 @@
 from ultralytics import YOLO
+import os
 
 # 定义模型配置字典，方便选择不同的模型配置
 MODEL_CONFIGS = {
-    'yolov10n': r"D:\devProject\detect\yolov10\ultralytics\cfg\models\v10\yolov10n.yaml",
-    'yolov10n_C2f_GhostModel_DynamicConv': r"D:\devProject\detect\yolov10\ultralytics\cfg\models\v10\yolov10n_C2f_GhostModel_DynamicConv.yaml",
-    'yolov10n_SimAm': r"D:\devProject\detect\yolov10\ultralytics\cfg\models\v10\yolov10n-SimAm.yaml",  # SimAm模型
-    'yolov10n_CBAM': r"D:\devProject\detect\yolov10\ultralytics\cfg\models\v10\yolov10n-CBAM.yaml",
-    'yolov10n_BiFPN': r"D:\devProject\detect\yolov10\ultralytics\cfg\models\v10\yolov10n_BiFPN.yaml",
-    'yolov10n_DynamicConv': r"D:\devProject\detect\yolov10\ultralytics\cfg\models\v10\yolov10n_DynamicConv.yaml",
-    'yolov10n-CBMAWITHSimAm': r"D:\devProject\detect\yolov10\ultralytics\cfg\models\v10\yolov10n-CBMAWITHSimAm.yaml",
-    'yolov10m_BiFPN': r"D:\devProject\detect\yolov10\ultralytics\cfg\models\v10\yolov10m_BiFPN.yaml"
+    'yolov10n': r"D:/devProject/detect/yolov10/ultralytics/cfg/models/v10/yolov10n.yaml",
+    'yolov10n_C2f_GhostModel_DynamicConv': r"D:/devProject/detect/yolov10/ultralytics/cfg/models/v10/yolov10n_C2f_GhostModel_DynamicConv.yaml",
+    'yolov10n_SimAm': r"D:/devProject/detect/yolov10/ultralytics/cfg/models/v10/yolov10n-SimAm.yaml",  # SimAm模型
+    'yolov10n_CBAM': r"D:/devProject/detect/yolov10/ultralytics/cfg/models/v10/yolov10n-CBAM.yaml",
+    'yolov10n_BiFPN': r"D:/devProject/detect/yolov10/ultralytics/cfg/models/v10/yolov10n_BiFPN.yaml",
+    'yolov10n_DynamicConv': r"D:/devProject/detect/yolov10/ultralytics/cfg/models/v10/yolov10n_DynamicConv.yaml",
+    'yolov10n-CBMAWITHSimAm': r"D:/devProject/detect/yolov10/ultralytics/cfg/models/v10/yolov10n-CBMAWITHSimAm.yaml",
+    'yolov10m_BiFPN': r"D:/devProject/detect/yolov10/ultralytics/cfg/models/v10/yolov10m_BiFPN.yaml",
+    'yolov10l.yaml': r"D:/devProject/detect/yolov10/ultralytics/cfg/models/v10/yolov10l.yaml"
 }
 
 
@@ -18,15 +20,17 @@ class YOLOTrainer:
     def __init__(self,
                  model_config_name: str,
                  data_yaml_path: str,
-                 epochs: int = 300,
-                 batch_size: int = 16,
+                 epochs: int = 200,
+                 batch_size: int = 32,
                  img_size: int = 1024,
+                 weights_path: str = None  # 允许指定继续训练的模型权重文件路径
                  ):
         self.model_config_name = model_config_name
         self.data_yaml_path = data_yaml_path
         self.epochs = epochs
         self.batch_size = batch_size
         self.img_size = img_size
+        self.weights_path = weights_path  # 新增：用于传入继续训练的权重路径
 
         # 从字典中选择模型配置路径
         self.model_yaml_path = self.get_model_yaml_path(model_config_name)
@@ -40,26 +44,49 @@ class YOLOTrainer:
     def train(self):
         """使用选择的模型配置进行训练"""
         print(f"Training using model config: {self.model_yaml_path}")
-        model = YOLO(self.model_yaml_path)  # 加载模型
-        results = model.train(data=self.data_yaml_path,
-                              epochs=self.epochs,
-                              batch=self.batch_size,
-                              name=self.model_config_name,  # 自定义文件名
-                              project="runs/train",  # 自定义文件保存路径
-                              imgsz=self.img_size)
+
+        # 加载YOLO模型，传入继续训练的权重文件（如果有）
+        model = YOLO(self.model_yaml_path)
+
+        # 如果指定了继续训练的权重路径，传入给模型
+        if self.weights_path:
+            print(f"Resuming training from checkpoint: {self.weights_path}")
+            model.load(self.weights_path)
+
+        results = model.train(
+            data=self.data_yaml_path,
+            epochs=self.epochs,
+            batch=self.batch_size,
+            name=self.model_config_name,  # 自定义文件名
+            project="runs/train",  # 自定义文件保存路径
+            imgsz=self.img_size
+        )
         return results
 
 
 # 主程序
 if __name__ == '__main__':
     # 选择要使用的模型配置
-    selected_model_config = 'yolov10m_BiFPN'  # 这里可以选择模型，如 'yolov10n', 'yolov10n_SimAm', 等
+    selected_model_config = 'yolov10n'  # 这里可以选择模型，如 'yolov10n', 'yolov10n_SimAm', 等
 
     # 数据路径
-    data_yaml_path = r'D:\devProject\detect\yolov10\datasets\GISDATA\data.yaml'
+    data_yaml_path = r'D:/devProject/detect/yolov10/datasets/GISDATA/data.yaml'
 
-    # 创建训练器对象
-    trainer = YOLOTrainer(model_config_name=selected_model_config, data_yaml_path=data_yaml_path)
+    # 如果训练已经中断并且有之前的权重，可以传入 `weights_path`
+    # last_checkpoint_path = r"D:/devProject/detect/yolov10/runs/train/yolov10m_BiFPN/weights/last.pt"  # 或者 best.pt
+
+    # 创建训练器对象，并指定继续训练的权重
+    trainer = YOLOTrainer(
+        model_config_name=selected_model_config,
+        data_yaml_path=data_yaml_path,
+        # weights_path=last_checkpoint_path  # 指定继续训练的权重路径
+    )
 
     # 开始训练
     results = trainer.train()
+
+# 导出
+# yolo export model=D:/devProject/detect/yolov10/runs/train/yolov10n/weights/best.pt format=onnx
+
+# 导出
+# yolo export model=D:/devProject/detect/yolov10/runs/train/yolov10m_BiFPN3/weights/best.pt format=onnx
