@@ -206,6 +206,6 @@ if __name__ == "__main__":
     image = torch.rand(*image_size)
     # Model
     model = C2f_GhostModule_DynamicConv(64, 64)
-    # model = DynamicConv(64,64,3,stride=2)
+    # model = DynamicConv(64, 64, 3, stride=2)
     out = model(image)
     print(out.size())

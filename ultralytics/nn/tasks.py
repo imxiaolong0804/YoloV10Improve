@@ -7,6 +7,7 @@ from pathlib import Path
 import torch
 import torch.nn as nn
 
+# 这里新添加了我自己的模块
 from .ADDModels import *
 
 from ultralytics.nn.modules import (
@@ -58,7 +59,9 @@ from ultralytics.nn.modules import (
     v10Detect,
     # Simam_module,
     # EMA_imporve,
-    Concat_BiFPN,  # 新加的内容
+    # Concat_BiFPN,  # 新加的内容
+    MoCAttention,
+    C2fMCAttn
 )
 from ultralytics.utils import DEFAULT_CFG_DICT, DEFAULT_CFG_KEYS, LOGGER, colorstr, emojis, yaml_load
 from ultralytics.utils.checks import check_requirements, check_suffix, check_yaml
@@ -894,9 +897,16 @@ def parse_model(d, ch, verbose=True):  # model_dict, input_channels(3)
             C2fCIB,
             # 添加自己的conv
             DynamicConv,
-            C2f_GhostModule_DynamicConv
+            C2f_GhostModule_DynamicConv,
+            MoCAttention,
+            C2f_MCAttn,
+            PPA,
+            C2fCIB_AssemFormer,
+            CSPStage,
+            C3RFEM,
+            PSA_DTA
         }:
-            c1, c2 = ch[f], args[0]
+            c1, c2 = ch[f], args[0]  # 获取当前层的输入通道和输出通道
             if c2 != nc:  # if c2 not equal to number of classes (i.e. for Classify() output)
                 c2 = make_divisible(min(c2, max_channels) * width, 8)
             if m is C2fAttn:
@@ -906,22 +916,67 @@ def parse_model(d, ch, verbose=True):  # model_dict, input_channels(3)
                 )  # num heads
 
             args = [c1, c2, *args[1:]]
-            if m in (BottleneckCSP, C1, C2, C2f, C2fAttn, C3, C3TR, C3Ghost, C3x, RepC3, C2fCIB,
+            if m in (BottleneckCSP,
+                     C1, C2, C2f, C2fAttn,
+                     C3, C3TR, C3Ghost, C3x, RepC3, C2fCIB,
                      # 这里也添加了C2f_GhostModule_DynamicConv
-                     C2f_GhostModule_DynamicConv
-                     ):
+                     C2f_GhostModule_DynamicConv,
+                     CSPStage
+                     ):  # 如果是这些模块，插入重复次数n
                 args.insert(2, n)  # number of repeats
                 n = 1
-        # -----------------------添加了注意力机制--------------------------------------------------------------------------
-        elif m in {CBAM}:
+        # ---------------------- 这里添加了 DAT ------------------------------------------------
+        elif m in {DAttentionBaseline}:
             c2 = ch[f]
             args = [c2, *args]
+        # -----------------------添加了注意力机制--------------------------------------------------------------------------
+        elif m in {CBAM}:
+            c2 = ch[f]  # 获取输入通道
+            args = [c2, *args]  # 调整参数，确保输入通道数正确
         elif m in {Simam_module}:
             c2 = ch[f]
             args = [c2, *args]
         elif m is Concat_BiFPN:
-            c2 = sum(ch[x] for x in f)
+            c2 = sum(ch[x] for x in f)  # 对于 `Concat_BiFPN` 模块，输出通道数是前面层的通道数之和
         # -----------------------添加了注意力机制--------------------------------------------------------------------------
+
+        # -----------------------添加了ASF机制--------------------------------------------------------------------------
+        # elif m is Zoom_cat:
+        #     c2 = sum(ch[x] for x in f)
+        # elif m is Add:
+        #     c2 = ch[f[-1]]
+        # elif m is ScalSeq:
+        #     c1 = [ch[x] for x in f]
+        #     c2 = make_divisible(args[0] * width, 8)
+        #     args = [c1, c2]
+        # elif m is attention_model:
+        #     args = [ch[f[-1]]]
+        # -----------------------添加了ASF机制 - -------------------------------------------------------------------------
+
+        # ----------------------- 添加了GoldYolo机制 - -------------------------------------------------------------------------
+
+        elif m is IFM:
+            c1 = ch[f]
+            c2 = sum(args[0])
+            args = [c1, *args]
+        elif m is InjectionMultiSum_Auto_pool:
+            c1 = ch[f[0]]
+            c2 = args[0]
+            args = [c1, *args]
+        elif m is PyramidPoolAgg:
+            c2 = args[0]
+            args = [sum([ch[f_] for f_ in f]), *args]
+        elif m is TopBasicLayer:
+            c2 = sum(args[1])
+        elif m in {SimFusion_4in, AdvPoolFusion}:
+            c2 = sum(ch[x] for x in f)
+        elif m is SimFusion_3in:
+            c2 = args[0]
+            if c2 != nc:
+                c2 = make_divisible(min(c2, max_channels) * width, 8)
+            args = [[ch[f_] for f_ in f], c2]
+        # ----------------------- 添加了GoldYolo机制 - -------------------------------------------------------------------------
+
         elif m is AIFI:
             args = [ch[f], *args]
         elif m in {HGStem, HGBlock}:

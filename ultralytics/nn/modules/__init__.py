@@ -17,8 +17,6 @@ Example:
     ```
 """
 
-# 这里有两个添加
-
 from .block import (
     C1,
     C2,
@@ -52,7 +50,9 @@ from .block import (
     C2fCIB,
     SCDown,
     RepVGGDW,
-    # Concat_BiFPN,
+    # 后面都是新加的模块
+    MoCAttention,
+    C2fMCAttn
 )
 from .conv import (
     CBAM,
@@ -149,7 +149,4 @@ __all__ = (
     "SCDown",
     "RepVGGDW",
     "v10Detect",
-    # "Simam_module",
-    # "EMA_imporve",
-    # "Concat_BiFPN",
 )

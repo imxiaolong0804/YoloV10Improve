@@ -321,24 +321,6 @@ class CBAM(nn.Module):
         return self.spatial_attention(self.channel_attention(x))
 
 
-#  这是添加的siman模块
-# class Simam_module(torch.nn.Module):
-#     def __init__(self, e_lambda=1e-4):
-#         super(Simam_module, self).__init__()
-#         self.act = nn.Sigmoid()  # 使用Sigmoid激活函数
-#         self.e_lambda = e_lambda  # 定义平滑项e_lambda，防止分母为0
-#
-#     def forward(self, x):
-#         b, c, h, w = x.size()  # 获取输入x的尺寸
-#         n = w * h - 1  # 计算特征图的元素数量减一，用于下面的归一化
-#         # 计算输入特征x与其均值之差的平方
-#         x_minus_mu_square = (x - x.mean(dim=[2, 3], keepdim=True)).pow(2)
-#         # 计算注意力权重y，这里实现了SimAM的核心计算公式
-#         y = x_minus_mu_square / (4 * (x_minus_mu_square.sum(dim=[2, 3], keepdim=True) / n + self.e_lambda)) + 0.5
-#         # 返回经过注意力加权的输入特征
-#         return x * self.act(y)
-
-
 class Concat(nn.Module):
     """Concatenate a list of tensors along dimension."""
 
