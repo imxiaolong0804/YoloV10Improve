@@ -899,7 +899,7 @@ def parse_model(d, ch, verbose=True):  # model_dict, input_channels(3)
             DynamicConv,
             C2f_GhostModule_DynamicConv,
             MoCAttention,
-            C2f_MCAttn,
+            C2fMCAttn,
             PPA,
             C2fCIB_AssemFormer,
             CSPStage,

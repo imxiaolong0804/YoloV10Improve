@@ -1,25 +1,38 @@
+import warnings
+
 from ultralytics import YOLO
 import os
 
-# 定义模型配置字典，方便选择不同的模型配置
+
+warnings.filterwarnings('ignore')
+
+# 获取当前文件所在目录
+BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ultralytics", "cfg", "models", "v10")
+
 MODEL_CONFIGS = {
-    'yolov10n': r"D:/devProject/detect/yolov10/ultralytics/cfg/models/v10/yolov10n.yaml",
-    'yolov10n_C2f_GhostModel_DynamicConv': r"D:/devProject/detect/yolov10/ultralytics/cfg/models/v10/yolov10n_C2f_GhostModel_DynamicConv.yaml",
-    'yolov10n_SimAm': r"D:/devProject/detect/yolov10/ultralytics/cfg/models/v10/yolov10n-SimAm.yaml",  # SimAm模型
-    'yolov10n_CBAM': r"D:/devProject/detect/yolov10/ultralytics/cfg/models/v10/yolov10n-CBAM.yaml",
-    'yolov10n_BiFPN': r"D:/devProject/detect/yolov10/ultralytics/cfg/models/v10/yolov10n_BiFPN.yaml",
-    'yolov10n_DynamicConv': r"D:/devProject/detect/yolov10/ultralytics/cfg/models/v10/yolov10n_DynamicConv.yaml",
-    'yolov10n-CBMAWITHSimAm': r"D:/devProject/detect/yolov10/ultralytics/cfg/models/v10/yolov10n-CBMAWITHSimAm.yaml",
-    'yolov10m_BiFPN': r"D:/devProject/detect/yolov10/ultralytics/cfg/models/v10/yolov10m_BiFPN.yaml",
-    'yolov10l.yaml': r"D:/devProject/detect/yolov10/ultralytics/cfg/models/v10/yolov10l.yaml"
+    'yolov10n': os.path.join(BASE_DIR, "yolov10n.yaml"),
+    'yolov10n_C2f_GhostModel_DynamicConv': os.path.join(BASE_DIR, "yolov10n_C2f_GhostModel_DynamicConv.yaml"),
+    'yolov10n_SimAm': os.path.join(BASE_DIR, "yolov10n-SimAm.yaml"),
+    'yolov10n_CBAM': os.path.join(BASE_DIR, "yolov10n-CBAM.yaml"),
+    'yolov10n_BiFPN': os.path.join(BASE_DIR, "yolov10n_BiFPN.yaml"),
+    'yolov10n_DynamicConv': os.path.join(BASE_DIR, "yolov10n_DynamicConv.yaml"),
+    'yolov10n-CBMAWITHSimAm': os.path.join(BASE_DIR, "yolov10n-CBMAWITHSimAm.yaml"),
+    'yolov10m_BiFPN': os.path.join(BASE_DIR, "yolov10m_BiFPN.yaml"),
+    'yolov10l': os.path.join(BASE_DIR, "yolov10l.yaml")
 }
 
 
 # 训练参数封装类
+def get_model_yaml_path(model_config_name: str):
+    """根据配置名获取模型yaml文件路径"""
+    return MODEL_CONFIGS.get(model_config_name)
+
+
 class YOLOTrainer:
     def __init__(self,
                  model_config_name: str,
                  data_yaml_path: str,
+                 save_path: str,
                  epochs: int = 200,
                  batch_size: int = 32,
                  img_size: int = 1024,
@@ -30,16 +43,13 @@ class YOLOTrainer:
         self.epochs = epochs
         self.batch_size = batch_size
         self.img_size = img_size
+        self.save_path = save_path
         self.weights_path = weights_path  # 新增：用于传入继续训练的权重路径
 
         # 从字典中选择模型配置路径
-        self.model_yaml_path = self.get_model_yaml_path(model_config_name)
+        self.model_yaml_path = get_model_yaml_path(model_config_name)
         if not self.model_yaml_path:
             raise ValueError(f"Model configuration '{model_config_name}' is not found!")
-
-    def get_model_yaml_path(self, model_config_name: str):
-        """根据配置名获取模型yaml文件路径"""
-        return MODEL_CONFIGS.get(model_config_name)
 
     def train(self):
         """使用选择的模型配置进行训练"""
@@ -58,8 +68,8 @@ class YOLOTrainer:
             epochs=self.epochs,
             batch=self.batch_size,
             name=self.model_config_name,  # 自定义文件名
-            project="runs/train",  # 自定义文件保存路径
-            imgsz=self.img_size
+            project=self.save_path,  # 自定义文件保存路径
+            imgsz=self.img_size,
         )
         return results
 
@@ -70,16 +80,18 @@ if __name__ == '__main__':
     selected_model_config = 'yolov10n'  # 这里可以选择模型，如 'yolov10n', 'yolov10n_SimAm', 等
 
     # 数据路径
-    data_yaml_path = r'D:/devProject/detect/yolov10/datasets/GISDATA/data.yaml'
+    data_yaml_path = r'D:/devProject/detect/yolov10/datasets/data/data.yaml'
 
     # 如果训练已经中断并且有之前的权重，可以传入 `weights_path`
-    # last_checkpoint_path = r"D:/devProject/detect/yolov10/runs/train/yolov10m_BiFPN/weights/last.pt"  # 或者 best.pt
+    # last_checkpoint_path = r"./yolov10n.pt"  # 或者 best.pt
 
     # 创建训练器对象，并指定继续训练的权重
     trainer = YOLOTrainer(
         model_config_name=selected_model_config,
         data_yaml_path=data_yaml_path,
-        # weights_path=last_checkpoint_path  # 指定继续训练的权重路径
+        # weights_path=last_checkpoint_path,  # 指定继续训练的权重路径
+        save_path="runs/graduate/train",
+        epochs=300
     )
 
     # 开始训练
