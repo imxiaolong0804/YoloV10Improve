@@ -3,8 +3,8 @@ import warnings
 from ultralytics import YOLO
 import os
 
-
-warnings.filterwarnings('ignore')
+# warnings.filterwarnings('ignore')
+warnings.filterwarnings("ignore", category=FutureWarning)
 
 # 获取当前文件所在目录
 BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ultralytics", "cfg", "models", "v10")
@@ -12,6 +12,9 @@ BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ultralytics
 MODEL_CONFIGS = {
     'yolov10n': os.path.join(BASE_DIR, "yolov10n.yaml"),
     'yolov10n_C2f_GhostModel_DynamicConv': os.path.join(BASE_DIR, "yolov10n_C2f_GhostModel_DynamicConv.yaml"),
+    'yolov10n_MCAttn': os.path.join(BASE_DIR, "yolov10n-MCAttn.yaml"),
+    'yolov10n_PPA': os.path.join(BASE_DIR, "yolov10n-PPA.yaml"),
+    'yolov10n_CSP': os.path.join(BASE_DIR, "yolov10n-CSPStage.yaml"),
     'yolov10n_SimAm': os.path.join(BASE_DIR, "yolov10n-SimAm.yaml"),
     'yolov10n_CBAM': os.path.join(BASE_DIR, "yolov10n-CBAM.yaml"),
     'yolov10n_BiFPN': os.path.join(BASE_DIR, "yolov10n_BiFPN.yaml"),
@@ -55,20 +58,33 @@ class YOLOTrainer:
         """使用选择的模型配置进行训练"""
         print(f"Training using model config: {self.model_yaml_path}")
 
-        # 加载YOLO模型，传入继续训练的权重文件（如果有）
+        # 1. 始终使用您选择的 .yaml 配置来构建模型结构
         model = YOLO(self.model_yaml_path)
 
-        # 如果指定了继续训练的权重路径，传入给模型
+        # 2. 确定初始权重文件路径
         if self.weights_path:
-            print(f"Resuming training from checkpoint: {self.weights_path}")
-            model.load(self.weights_path)
+            # 如果指定了继续训练的权重路径，使用它
+            initial_weights = self.weights_path
+            print(f"Resuming training from checkpoint: {initial_weights}")
+        else:
+            # 否则，使用对应的官方预训练权重 (例如：'yolov10n.pt')
+            # 我们可以根据 model_config_name 智能地生成预训练权重名称
+            # model_name_base = self.model_config_name.split('_')[0].split('-')[0]  # 提取 'yolov10n' 部分
+            initial_weights = "yolov10l.pt"
+            print(f"Starting training with official pretrained weights: {initial_weights}")
 
+        # 3. 将权重文件加载到已经构建好的自定义结构模型中
+        # model.load() 方法可以用来将权重从一个文件迁移到当前模型结构中
+        # 即使模型结构有微小变动，model.load() 也会进行关键层的匹配
+        model.load(initial_weights)
+
+        # 4. 开始训练
         results = model.train(
             data=self.data_yaml_path,
             epochs=self.epochs,
             batch=self.batch_size,
-            name=self.model_config_name,  # 自定义文件名
-            project=self.save_path,  # 自定义文件保存路径
+            name=self.model_config_name,
+            project=self.save_path,
             imgsz=self.img_size,
         )
         return results
@@ -77,7 +93,7 @@ class YOLOTrainer:
 # 主程序
 if __name__ == '__main__':
     # 选择要使用的模型配置
-    selected_model_config = 'yolov10n'  # 这里可以选择模型，如 'yolov10n', 'yolov10n_SimAm', 等
+    selected_model_config = 'yolov10l'  # 这里可以选择模型，如 'yolov10n', 'yolov10n_SimAm', 等
 
     # 数据路径
     data_yaml_path = r'D:/devProject/detect/yolov10/datasets/data/data.yaml'
@@ -91,7 +107,8 @@ if __name__ == '__main__':
         data_yaml_path=data_yaml_path,
         # weights_path=last_checkpoint_path,  # 指定继续训练的权重路径
         save_path="runs/graduate/train",
-        epochs=300
+        epochs=300,
+        batch_size=16
     )
 
     # 开始训练
