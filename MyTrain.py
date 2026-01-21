@@ -1,13 +1,16 @@
 import warnings
+
+# 屏蔽所有警告信息
+warnings.filterwarnings('ignore')
+warnings.filterwarnings("ignore", category=FutureWarning)
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+
 from ultralytics import YOLO
 import os
 import json
 import csv
 from datetime import datetime
 from pathlib import Path
-
-# warnings.filterwarnings('ignore')
-warnings.filterwarnings("ignore", category=FutureWarning)
 
 # 获取当前文件所在目录
 BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ultralytics", "cfg", "models", "v10")
@@ -99,20 +102,19 @@ class YOLOTrainer:
             imgsz=self.img_size,
         )
         
-        # 5. 训练完成后进行验证并获取详细指标
+        # 5. 训练完成后收集指标（使用训练过程中的验证结果）
         print(f"\n{'='*80}")
-        print(f"训练完成，开始验证模型: {self.model_config_name}")
+        print(f"训练完成，收集模型指标: {self.model_config_name}")
         print(f"{'='*80}\n")
         
-        # 加载最佳权重进行验证
+        # 获取最佳权重路径
         best_model_path = os.path.join(self.save_path, self.model_config_name, "weights", "best.pt")
+        
+        # 加载最佳模型用于获取模型信息
         best_model = YOLO(best_model_path)
         
-        # 验证模型
-        val_results = best_model.val(data=self.data_yaml_path)
-        
-        # 6. 收集并保存详细指标
-        training_info = self._collect_training_info(best_model, val_results, best_model_path)
+        # 6. 收集并保存详细指标（从训练结果中提取）
+        training_info = self._collect_training_info(best_model, results, best_model_path)
         self._save_training_info(training_info)
         
         print(f"\n{'='*80}")
@@ -122,8 +124,14 @@ class YOLOTrainer:
         
         return results, training_info
     
-    def _collect_training_info(self, model, val_results, model_path):
-        """收集训练信息和模型指标"""
+    def _collect_training_info(self, model, results, model_path):
+        """收集训练信息和模型指标
+        
+        Args:
+            model: 训练后的YOLO模型
+            results: model.train()返回的DetMetrics对象，包含验证指标
+            model_path: 最佳模型权重路径
+        """
         training_info = {
             "model_name": self.model_config_name,
             "model_yaml": self.model_yaml_path,
@@ -135,49 +143,90 @@ class YOLOTrainer:
             "best_model_path": model_path,
         }
         
-        # 获取验证结果
+        # 直接从训练返回的results对象（DetMetrics）获取验证指标
         try:
-            # 总体指标
-            training_info["metrics"] = {
-                "mAP50": float(val_results.box.map50) if hasattr(val_results.box, 'map50') else 0.0,
-                "mAP50-95": float(val_results.box.map) if hasattr(val_results.box, 'map') else 0.0,
-                "precision": float(val_results.box.mp) if hasattr(val_results.box, 'mp') else 0.0,
-                "recall": float(val_results.box.mr) if hasattr(val_results.box, 'mr') else 0.0,
-            }
-            
-            # 每个类别的指标
-            if hasattr(val_results.box, 'maps'):
-                class_names = model.names if hasattr(model, 'names') else {}
-                per_class_metrics = {}
+            if results is not None and hasattr(results, 'box'):
+                # results是DetMetrics对象，包含box属性（Metric对象）
+                # box.mp = mean precision, box.mr = mean recall
+                # box.map50 = mAP@0.5, box.map = mAP@0.5:0.95
+                training_info["metrics"] = {
+                    "mAP50": float(results.box.map50) if hasattr(results.box, 'map50') else 0.0,
+                    "mAP50-95": float(results.box.map) if hasattr(results.box, 'map') else 0.0,
+                    "precision": float(results.box.mp) if hasattr(results.box, 'mp') else 0.0,
+                    "recall": float(results.box.mr) if hasattr(results.box, 'mr') else 0.0,
+                }
                 
-                for idx, (ap50, ap) in enumerate(zip(val_results.box.ap50, val_results.box.ap)):
-                    class_name = class_names.get(idx, f"class_{idx}")
-                    per_class_metrics[class_name] = {
-                        "mAP50": float(ap50) if ap50 is not None else 0.0,
-                        "mAP50-95": float(ap) if ap is not None else 0.0,
+                print("\n" + "="*60)
+                print("验证指标汇总 (直接从训练结果获取):")
+                print("="*60)
+                print(f"mAP@0.5: {training_info['metrics']['mAP50']:.4f}")
+                print(f"mAP@0.5:0.95: {training_info['metrics']['mAP50-95']:.4f}")
+                print(f"Precision: {training_info['metrics']['precision']:.4f}")
+                print(f"Recall: {training_info['metrics']['recall']:.4f}")
+                
+                # 尝试获取每类指标
+                if hasattr(results.box, 'ap50') and hasattr(results.box, 'ap'):
+                    class_names = model.names if hasattr(model, 'names') else {}
+                    ap50_per_class = results.box.ap50  # 每类的AP@0.5
+                    ap_per_class = results.box.ap  # 每类的AP@0.5:0.95
+                    
+                    if len(ap50_per_class) > 0 and len(class_names) > 0:
+                        per_class_metrics = {}
+                        ap_class_index = results.box.ap_class_index if hasattr(results.box, 'ap_class_index') else range(len(ap50_per_class))
+                        
+                        for i, class_idx in enumerate(ap_class_index):
+                            if class_idx in class_names:
+                                class_name = class_names[class_idx]
+                                per_class_metrics[class_name] = {
+                                    "mAP50": float(ap50_per_class[i]) if i < len(ap50_per_class) else 0.0,
+                                    "mAP50-95": float(ap_per_class[i]) if i < len(ap_per_class) else 0.0,
+                                }
+                        
+                        if per_class_metrics:
+                            training_info["per_class_metrics"] = per_class_metrics
+                            print("\n每类指标:")
+                            print("-" * 60)
+                            for class_name, metrics in per_class_metrics.items():
+                                print(f"  {class_name}:")
+                                print(f"    mAP@0.5: {metrics['mAP50']:.4f}")
+                                print(f"    mAP@0.5:0.95: {metrics['mAP50-95']:.4f}")
+            else:
+                # 如果results不是预期的DetMetrics对象，尝试从results_dict获取
+                if results is not None and hasattr(results, 'results_dict'):
+                    results_dict = results.results_dict
+                    training_info["metrics"] = {
+                        "mAP50": float(results_dict.get('metrics/mAP50(B)', 0.0)),
+                        "mAP50-95": float(results_dict.get('metrics/mAP50-95(B)', 0.0)),
+                        "precision": float(results_dict.get('metrics/precision(B)', 0.0)),
+                        "recall": float(results_dict.get('metrics/recall(B)', 0.0)),
                     }
-                
-                training_info["per_class_metrics"] = per_class_metrics
-            
-            print("\n" + "="*60)
-            print("验证指标汇总:")
-            print("="*60)
-            print(f"mAP@0.5: {training_info['metrics']['mAP50']:.4f}")
-            print(f"mAP@0.5:0.95: {training_info['metrics']['mAP50-95']:.4f}")
-            print(f"Precision: {training_info['metrics']['precision']:.4f}")
-            print(f"Recall: {training_info['metrics']['recall']:.4f}")
-            
-            if "per_class_metrics" in training_info:
-                print("\n每类指标:")
-                print("-" * 60)
-                for class_name, metrics in training_info["per_class_metrics"].items():
-                    print(f"  {class_name}:")
-                    print(f"    mAP@0.5: {metrics['mAP50']:.4f}")
-                    print(f"    mAP@0.5:0.95: {metrics['mAP50-95']:.4f}")
+                    print("\n" + "="*60)
+                    print("验证指标汇总 (从results_dict获取):")
+                    print("="*60)
+                    print(f"mAP@0.5: {training_info['metrics']['mAP50']:.4f}")
+                    print(f"mAP@0.5:0.95: {training_info['metrics']['mAP50-95']:.4f}")
+                    print(f"Precision: {training_info['metrics']['precision']:.4f}")
+                    print(f"Recall: {training_info['metrics']['recall']:.4f}")
+                else:
+                    print(f"警告: 无法从训练结果获取验证指标，results类型: {type(results)}")
+                    training_info["metrics"] = {
+                        "mAP50": 0.0,
+                        "mAP50-95": 0.0,
+                        "precision": 0.0,
+                        "recall": 0.0,
+                    }
             
         except Exception as e:
             print(f"警告: 收集验证指标时出错: {e}")
-            training_info["metrics"] = {"error": str(e)}
+            import traceback
+            traceback.print_exc()
+            training_info["metrics"] = {
+                "mAP50": 0.0,
+                "mAP50-95": 0.0,
+                "precision": 0.0,
+                "recall": 0.0,
+                "error": str(e)
+            }
         
         # 获取模型大小和FLOPs
         try:
@@ -275,7 +324,7 @@ class YOLOTrainer:
 def batch_train_models(model_configs_to_train=None, 
                        data_yaml_path=None,
                        save_path="runs/bxl/train",
-                       log_dir="runs/training_logs",
+                       log_dir="runs/bxl/training_logs",
                        epochs=180,
                        batch_size=32,
                        img_size=1024):
@@ -316,7 +365,7 @@ def batch_train_models(model_configs_to_train=None,
         
         try:
             # 为每个模型创建独立的保存路径
-            model_save_path = f"{save_path}_{model_config_name}"
+            model_save_path = f"{model_config_name}"
             
             # 创建训练器
             trainer = YOLOTrainer(
@@ -399,11 +448,11 @@ if __name__ == '__main__':
     # data_yaml_path = r'D:\devProject\detect\yolov10\datasets\GISDATA\data.yaml'
     
     # 训练参数
-    EPOCHS = 180
+    EPOCHS = 300
     BATCH_SIZE = 32
     IMG_SIZE = 1024
     SAVE_PATH = "runs/bxl/train"
-    LOG_DIR = "runs/training_logs"
+    LOG_DIR = "runs/bxl/training_logs"
     
     # ========== 选项 1: 训练所有模型 ==========
     print("\n选择训练模式:")
