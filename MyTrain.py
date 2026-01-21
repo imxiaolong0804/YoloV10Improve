@@ -235,9 +235,25 @@ class YOLOTrainer:
             training_info["model_size_mb"] = round(model_size_mb, 2)
             
             # 获取模型信息（包括参数量和FLOPs）
+            # model.info() 返回格式: (n_layers, n_params, n_gradients, n_flops)
             model_info = model.info(verbose=False)
-            training_info["parameters"] = model_info[1] if isinstance(model_info, tuple) else "N/A"
-            training_info["gflops"] = model_info[2] if isinstance(model_info, tuple) and len(model_info) > 2 else "N/A"
+            
+            if model_info is not None:
+                if isinstance(model_info, (tuple, list)) and len(model_info) >= 4:
+                    # 格式: (layers, params, gradients, flops)
+                    n_params = model_info[1]
+                    n_flops = model_info[3]
+                    training_info["parameters"] = n_params
+                    training_info["gflops"] = round(n_flops, 2) if isinstance(n_flops, (int, float)) else n_flops
+                elif isinstance(model_info, (tuple, list)) and len(model_info) >= 2:
+                    training_info["parameters"] = model_info[1]
+                    training_info["gflops"] = model_info[2] if len(model_info) > 2 else "N/A"
+                else:
+                    training_info["parameters"] = "N/A"
+                    training_info["gflops"] = "N/A"
+            else:
+                training_info["parameters"] = "N/A"
+                training_info["gflops"] = "N/A"
             
             print("\n" + "="*60)
             print("模型信息:")
@@ -249,6 +265,8 @@ class YOLOTrainer:
             
         except Exception as e:
             print(f"警告: 获取模型信息时出错: {e}")
+            import traceback
+            traceback.print_exc()
             training_info["model_size_mb"] = "N/A"
             training_info["parameters"] = "N/A"
             training_info["gflops"] = "N/A"
@@ -364,8 +382,8 @@ def batch_train_models(model_configs_to_train=None,
         print(f"{'#'*80}\n")
         
         try:
-            # 为每个模型创建独立的保存路径
-            model_save_path = f"{model_config_name}"
+            # 为每个模型创建独立的保存路径（在save_path基础上追加模型key）
+            model_save_path = save_path
             
             # 创建训练器
             trainer = YOLOTrainer(
@@ -445,7 +463,6 @@ if __name__ == '__main__':
     
     # 数据路径
     data_yaml_path = r'D:\devProject\detect\yolov10\datasets\data\data.yaml'
-    # data_yaml_path = r'D:\devProject\detect\yolov10\datasets\GISDATA\data.yaml'
     
     # 训练参数
     EPOCHS = 300
