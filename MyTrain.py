@@ -271,6 +271,56 @@ class YOLOTrainer:
             training_info["parameters"] = "N/A"
             training_info["gflops"] = "N/A"
         
+        # 计算模型 FPS（通过推理测试）
+        try:
+            import time
+            import torch
+            
+            # 创建测试输入
+            device = 'cuda' if torch.cuda.is_available() else 'cpu'
+            test_input = torch.randn(1, 3, self.img_size, self.img_size).to(device)
+            
+            # 将模型设置为评估模式
+            model.model.eval()
+            model.model.to(device)
+            
+            # 预热（让GPU完全启动）
+            with torch.no_grad():
+                for _ in range(10):
+                    _ = model.model(test_input)
+            
+            # 正式测试
+            torch.cuda.synchronize() if torch.cuda.is_available() else None
+            num_iterations = 100
+            start_time = time.time()
+            
+            with torch.no_grad():
+                for _ in range(num_iterations):
+                    _ = model.model(test_input)
+            
+            torch.cuda.synchronize() if torch.cuda.is_available() else None
+            end_time = time.time()
+            
+            # 计算FPS
+            total_time = end_time - start_time
+            fps = num_iterations / total_time
+            inference_time_ms = (total_time / num_iterations) * 1000
+            
+            training_info["fps"] = round(fps, 2)
+            training_info["inference_time_ms"] = round(inference_time_ms, 2)
+            
+            print("="*60)
+            print("推理速度 (batch_size=1):")
+            print("="*60)
+            print(f"FPS: {training_info['fps']}")
+            print(f"单张推理时间: {training_info['inference_time_ms']} ms")
+            print("="*60 + "\n")
+            
+        except Exception as e:
+            print(f"警告: 计算FPS时出错: {e}")
+            training_info["fps"] = "N/A"
+            training_info["inference_time_ms"] = "N/A"
+        
         return training_info
     
     def _save_training_info(self, training_info):
@@ -294,7 +344,7 @@ class YOLOTrainer:
             fieldnames = [
                 'model_name', 'training_date', 'epochs', 'batch_size', 'img_size',
                 'mAP50', 'mAP50-95', 'precision', 'recall',
-                'model_size_mb', 'parameters', 'gflops', 'best_model_path'
+                'model_size_mb', 'parameters', 'gflops', 'fps', 'inference_time_ms', 'best_model_path'
             ]
             writer = csv.DictWriter(f, fieldnames=fieldnames)
             
@@ -314,6 +364,8 @@ class YOLOTrainer:
                 'model_size_mb': training_info.get('model_size_mb', 'N/A'),
                 'parameters': training_info.get('parameters', 'N/A'),
                 'gflops': training_info.get('gflops', 'N/A'),
+                'fps': training_info.get('fps', 'N/A'),
+                'inference_time_ms': training_info.get('inference_time_ms', 'N/A'),
                 'best_model_path': training_info['best_model_path']
             }
             writer.writerow(row)
@@ -466,9 +518,9 @@ if __name__ == '__main__':
     
     # 训练参数
     EPOCHS = 300
-    BATCH_SIZE = 32
+    BATCH_SIZE = 48
     IMG_SIZE = 1024
-    SAVE_PATH = "runs/bxl/train"
+    SAVE_PATH = "runs/bxl/models"
     LOG_DIR = "runs/bxl/training_logs"
     
     # ========== 选项 1: 训练所有模型 ==========
