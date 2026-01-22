@@ -433,6 +433,14 @@ def batch_train_models(model_configs_to_train=None,
         print(f"# [{idx}/{len(model_configs_to_train)}] 开始训练: {model_config_name}")
         print(f"{'#'*80}\n")
         
+        # 训练前清理显存和内存
+        import torch
+        import gc
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            print(f"清理显存前: {torch.cuda.memory_allocated() / 1024**3:.2f} GB")
+        gc.collect()
+        
         try:
             # 为每个模型创建独立的保存路径（在save_path基础上追加模型key）
             model_save_path = save_path
@@ -451,6 +459,12 @@ def batch_train_models(model_configs_to_train=None,
             # 开始训练
             results, training_info = trainer.train()
             
+            # 训练后立即清理显存
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                print(f"清理显存后: {torch.cuda.memory_allocated() / 1024**3:.2f} GB")
+            gc.collect()
+            
             # 记录结果
             all_results.append({
                 'model': model_config_name,
@@ -462,6 +476,67 @@ def batch_train_models(model_configs_to_train=None,
             print(f"✓ 模型 {model_config_name} 训练成功！")
             print(f"{'='*80}\n")
             
+        except RuntimeError as e:
+            # 处理显存不足错误
+            if "out of memory" in str(e).lower():
+                print(f"\n{'='*80}")
+                print(f"⚠ 模型 {model_config_name} 显存不足，尝试降低参数重试")
+                print(f"{'='*80}\n")
+                
+                # 强制清理显存
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+                    torch.cuda.ipc_collect()
+                gc.collect()
+                
+                try:
+                    # 降低 batch_size 重试
+                    reduced_batch = max(batch_size // 2, 4)
+                    print(f"降低 batch_size: {batch_size} -> {reduced_batch}")
+                    
+                    trainer = YOLOTrainer(
+                        model_config_name=model_config_name,
+                        data_yaml_path=data_yaml_path,
+                        save_path=model_save_path,
+                        log_dir=log_dir,
+                        epochs=epochs,
+                        batch_size=reduced_batch,  # 降低 batch_size
+                        img_size=img_size
+                    )
+                    
+                    results, training_info = trainer.train()
+                    
+                    # 清理显存
+                    if torch.cuda.is_available():
+                        torch.cuda.empty_cache()
+                    gc.collect()
+                    
+                    all_results.append({
+                        'model': model_config_name,
+                        'status': 'success',
+                        'info': training_info,
+                        'note': f'batch_size降低为{reduced_batch}'
+                    })
+                    
+                    print(f"\n{'='*80}")
+                    print(f"✓ 模型 {model_config_name} 训练成功（降低参数后）")
+                    print(f"{'='*80}\n")
+                    continue
+                    
+                except Exception as retry_e:
+                    print(f"重试失败: {retry_e}")
+                    all_results.append({
+                        'model': model_config_name,
+                        'status': 'failed',
+                        'error': f'显存不足，降低参数后仍失败: {str(retry_e)}'
+                    })
+            else:
+                all_results.append({
+                    'model': model_config_name,
+                    'status': 'failed',
+                    'error': str(e)
+                })
+        
         except Exception as e:
             print(f"\n{'='*80}")
             print(f"✗ 模型 {model_config_name} 训练失败！")
@@ -476,6 +551,11 @@ def batch_train_models(model_configs_to_train=None,
             
             import traceback
             traceback.print_exc()
+            
+            # 清理显存后继续
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+            gc.collect()
             
             # 继续训练下一个模型
             continue
@@ -518,7 +598,7 @@ if __name__ == '__main__':
     
     # 训练参数
     EPOCHS = 300
-    BATCH_SIZE = 48
+    BATCH_SIZE = 32
     IMG_SIZE = 1024
     SAVE_PATH = "runs/bxl/models"
     LOG_DIR = "runs/bxl/training_logs"
