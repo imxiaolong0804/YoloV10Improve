@@ -1,7 +1,28 @@
+import warnings
+warnings.filterwarnings('ignore')
+warnings.filterwarnings("ignore", category=FutureWarning)
+
 from ultralytics import YOLOv10, YOLO
 import os
 from pathlib import Path
 from datetime import datetime
+import tkinter as tk
+from tkinter import filedialog
+
+
+def select_folder(title="选择文件夹"):
+    """弹出文件夹选择对话框"""
+    root = tk.Tk()
+    root.withdraw()  # 隐藏主窗口
+    root.attributes('-topmost', True)  # 置顶显示
+    
+    folder_path = filedialog.askdirectory(
+        title=title,
+        initialdir=os.getcwd()
+    )
+    
+    root.destroy()
+    return folder_path if folder_path else None
 
 
 class YOLOPredictor:
@@ -218,9 +239,6 @@ def batch_predict(source: str,
 if __name__ == '__main__':
     # ========== 配置区域 ==========
     
-    # 要检测的数据源（可以是图片、视频或文件夹）
-    SOURCE = r'D:\devProject\detect\yolov10\datasets\data\test\images'
-    
     # 模型权重目录（训练保存的模型）
     MODELS_DIR = "runs/bxl/models"
     
@@ -230,6 +248,19 @@ if __name__ == '__main__':
     # 预测参数
     IMG_SIZE = 1024
     CONF = 0.25  # 置信度阈值
+    
+    # ========== 选择数据源 ==========
+    print("\n" + "="*60)
+    print("请选择要检测的数据源文件夹")
+    print("="*60)
+    
+    SOURCE = select_folder(title="选择要检测的图片文件夹")
+    
+    if not SOURCE:
+        print("\n错误: 未选择数据源，程序退出。")
+        exit(0)
+    
+    print(f"\n已选择数据源: {SOURCE}\n")
     
     # ========== 选择预测模式 ==========
     print("\n选择预测模式:")
