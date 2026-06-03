@@ -15,6 +15,7 @@ from pathlib import Path
 # 获取当前文件所在目录
 BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ultralytics", "cfg", "models", "v10")
 
+# 模型配置
 MODEL_CONFIGS = {
     'yolov10n': os.path.join(BASE_DIR, "yolov10n.yaml"),
     'yolov10n_MCAttn': os.path.join(BASE_DIR, "yolov10n-MCAttn.yaml"),
@@ -594,7 +595,7 @@ if __name__ == '__main__':
     # ========== 配置区域 ==========
     
     # 数据路径
-    data_yaml_path = r'D:\devProject\detect\yolov10\datasets\data\data.yaml'
+    data_yaml_path = r'D:\devProject\detect\yolov10\datasets\tinyData\data.yaml'
     
     # 训练参数
     EPOCHS = 300

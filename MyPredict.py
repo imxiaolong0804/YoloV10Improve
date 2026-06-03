@@ -243,7 +243,7 @@ if __name__ == '__main__':
     MODELS_DIR = "runs/bxl/models"
     
     # 预测结果保存路径
-    SAVE_PATH = "runs/bxl/predict"
+    SAVE_PATH = "runs/bxl/predictMulti"
     
     # 预测参数
     IMG_SIZE = 1024
